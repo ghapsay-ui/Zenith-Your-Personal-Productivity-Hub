@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Zenith - A simple, fast, and intuitive task management application">
+    <meta name="author" content="Zenith Team">
+    <title>Zenith - Task Management</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- jsPDF Library for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <!-- Application Header -->
+    <header class="app-header">
+        <h1>Zenith</h1>
+        <p class="tagline">Simple. Fast. Intuitive.</p>
+    </header>
+
+    <!-- Main Application Container -->
+    <main class="app-main">
+        <!-- Add Task Button & Action Buttons -->
+        <div class="add-task-container">
+            <button type="button" id="addTaskBtn" class="btn-add-task" aria-label="Add new task">
+                ➕ Add Task
+            </button>
+            <button type="button" id="notificationSettingsBtn" class="btn-notification-settings" aria-label="Notification settings">
+                🔔 Notifications
+            </button>
+            <button type="button" id="reportsBtn" class="btn-reports" aria-label="View reports">
+                📊 Reports
+            </button>
+            <button type="button" id="exportBtn" class="btn-export" aria-label="Export tasks">
+                📥 Export
+            </button>
+        </div>
+
+        <!-- Filter and Sort Controls -->
+        <aside class="controls-panel">
+            <!-- Filter Results Count -->
+            <span id="filterCount" class="filter-count" style="display: none;"></span>
+
+            <!-- Status Filter -->
+            <div class="filter-controls">
+                <label for="filterStatus">
+                    <span class="control-icon">🔍</span>
+                    Filter by Status:
+                </label>
+                <select id="filterStatus" name="filterStatus" aria-label="Filter tasks by status">
+                    <option value="all">All Tasks</option>
+                    <option value="todo">To Do</option>
+                    <option value="inprogress">In Progress</option>
+                    <option value="completed">Completed</option>
+                </select>
+            </div>
+
+            <!-- Priority Filter -->
+            <div class="filter-controls">
+                <label for="filterPriority">
+                    <span class="control-icon">⭐</span>
+                    Priority:
+                </label>
+                <select id="filterPriority" name="filterPriority" aria-label="Filter tasks by priority">
+                    <option value="all">All Priorities</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+
+            <!-- Tag Filter -->
+            <div class="filter-controls">
+                <label for="filterTag">
+                    <span class="control-icon">🏷️</span>
+                    Tag:
+                </label>
+                <select id="filterTag" name="filterTag" aria-label="Filter tasks by tag">
+                    <option value="all">All Tags</option>
+                    <!-- Tags will be populated dynamically -->
+                </select>
+            </div>
+            
+            <!-- Sort Control -->
+            <div class="sort-controls">
+                <label for="sortBy">
+                    <span class="control-icon">↕️</span>
+                    Sort by:
+                </label>
+                <select id="sortBy" name="sortBy" aria-label="Sort tasks">
+                    <option value="createdAt">Date Created</option>
+                    <option value="dueDate">Due Date</option>
+                    <option value="priority">Priority</option>
+                </select>
+            </div>
+
+            <!-- Sort Order Toggle -->
+            <button 
+                type="button" 
+                id="sortOrderToggle" 
+                class="btn btn-sort-toggle" 
+                aria-label="Toggle sort order"
+                title="Toggle sort order"
+            >
+                ↓
+            </button>
+
+            <!-- Reset Button -->
+            <button type="button" class="btn btn-reset" id="resetFiltersBtn" aria-label="Reset all filters">
+                Reset Filters
+            </button>
+        </aside>
+
+        <!-- Task Board - Three Column Layout -->
+        <section class="task-board">
+            <!-- To Do Column -->
+            <article class="task-column" id="todoColumn">
+                <div class="column-header">
+                    <h2>To Do</h2>
+                    <span class="task-count" id="todoCount">0</span>
+                </div>
+                <div class="task-list" id="todoList" data-status="todo" aria-label="To Do tasks">
+                    <!-- Task cards will be dynamically inserted here -->
+                </div>
+            </article>
+
+            <!-- In Progress Column -->
+            <article class="task-column" id="inProgressColumn">
+                <div class="column-header">
+                    <h2>In Progress</h2>
+                    <span class="task-count" id="inProgressCount">0</span>
+                </div>
+                <div class="task-list" id="inProgressList" data-status="inprogress" aria-label="In Progress tasks">
+                    <!-- Task cards will be dynamically inserted here -->
+                </div>
+            </article>
+
+            <!-- Completed Column -->
+            <article class="task-column" id="completedColumn">
+                <div class="column-header">
+                    <h2>Completed</h2>
+                    <span class="task-count" id="completedCount">0</span>
+                </div>
+                <div class="task-list" id="completedList" data-status="completed" aria-label="Completed tasks">
+                    <!-- Task cards will be dynamically inserted here -->
+                </div>
+            </article>
+        </section>
+    </main>
+
+    <!-- Modal for Adding/Editing Tasks -->
+    <div id="taskModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" aria-describedby="modalDescription" aria-hidden="true">
+        <div class="modal-overlay" aria-hidden="true"></div>
+        
+        <div class="modal-content" role="document">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add New Task</h2>
+                <button type="button" class="close-modal" aria-label="Close task form" title="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            
+            <p id="modalDescription" class="sr-only">Form to create or edit a task with title, description, priority, due date, tags, and sub-tasks</p>
+            
+            <form id="taskForm" class="task-form" novalidate>
+                <!-- Hidden field to store task ID for editing -->
+                <input type="hidden" id="taskId" name="taskId" value="">
+
+                <!-- Title Field (Required) -->
+                <div class="form-group">
+                    <label for="taskTitle">
+                        Title <span class="required" aria-label="required">*</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="taskTitle" 
+                        name="title" 
+                        placeholder="Enter task title" 
+                        required 
+                        maxlength="100"
+                        autocomplete="off"
+                        aria-required="true"
+                        aria-describedby="titleHelp"
+                    >
+                    <span id="titleHelp" class="field-help">Maximum 100 characters</span>
+                    <span class="error-message" id="titleError" role="alert"></span>
+                </div>
+
+                <!-- Description Field (Optional) -->
+                <div class="form-group">
+                    <label for="taskDescription">
+                        Description <span class="optional-label">(Optional)</span>
+                    </label>
+                    <textarea 
+                        id="taskDescription" 
+                        name="description" 
+                        placeholder="Enter task description (optional)" 
+                        rows="4"
+                        maxlength="500"
+                        autocomplete="off"
+                        aria-describedby="descriptionHelp"
+                    ></textarea>
+                    <span id="descriptionHelp" class="field-help">Maximum 500 characters</span>
+                    <span class="char-count" id="descriptionCount" aria-live="polite">0 / 500</span>
+                </div>
+
+                <!-- Priority and Due Date Row -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taskPriority">Priority</label>
+                        <select 
+                            id="taskPriority" 
+                            name="priority"
+                            aria-describedby="priorityHelp"
+                        >
+                            <option value="low">Low</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="high">High</option>
+                        </select>
+                        <span id="priorityHelp" class="field-help">Task importance level</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taskDueDate">
+                            Due Date <span class="optional-label">(Optional)</span>
+                        </label>
+                        <input 
+                            type="date" 
+                            id="taskDueDate" 
+                            name="dueDate"
+                            aria-describedby="dueDateHelp"
+                        >
+                        <span id="dueDateHelp" class="field-help">Task deadline</span>
+                    </div>
+                </div>
+
+                <!-- Tags Field (NEW) -->
+                <div class="form-group">
+                    <label for="taskTags">
+                        Tags <span class="optional-label">(Optional)</span>
+                    </label>
+                    <input 
+                        type="text" 
+                        id="taskTags" 
+                        name="tags" 
+                        placeholder="e.g., work, urgent, personal (comma-separated)" 
+                        maxlength="200"
+                        autocomplete="off"
+                        aria-describedby="tagsHelp"
+                    >
+                    <span id="tagsHelp" class="field-help">Comma-separated tags (max 10 tags, 20 chars each)</span>
+                    <div id="tagPreview" class="tag-preview"></div>
+                </div>
+
+                <!-- Sub-tasks Section (NEW) -->
+                <div class="form-group">
+                    <label for="subtaskInput">
+                        Sub-tasks <span class="optional-label">(Optional)</span>
+                    </label>
+                    <div class="subtask-input-container">
+                        <input 
+                            type="text" 
+                            id="subtaskInput" 
+                            placeholder="Add a sub-task and press Enter" 
+                            maxlength="100"
+                            autocomplete="off"
+                            aria-describedby="subtaskHelp"
+                        >
+                        <button type="button" id="addSubtaskBtn" class="btn-add-subtask" aria-label="Add sub-task">
+                            ➕
+                        </button>
+                    </div>
+                    <span id="subtaskHelp" class="field-help">Break down tasks into smaller items (max 20)</span>
+                    <div id="subtaskList" class="subtask-list">
+                        <!-- Sub-tasks will be added here dynamically -->
+                    </div>
+                </div>
+
+                <!-- Status Field (Hidden for Add, Visible for Edit) -->
+                <div class="form-group" id="statusGroup" style="display: none;">
+                    <label for="taskStatus">Status</label>
+                    <select 
+                        id="taskStatus" 
+                        name="status"
+                        aria-describedby="statusHelp"
+                    >
+                        <option value="todo">To Do</option>
+                        <option value="inprogress">In Progress</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                    <span id="statusHelp" class="field-help">Current workflow stage</span>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" id="cancelBtn">
+                        Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="saveTaskBtn">
+                        <span class="btn-text">Save Task</span>
+                        <span class="btn-loading" style="display: none;">Saving...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Notification Settings Modal -->
+    <div id="notificationModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="notificationModalTitle" aria-hidden="true">
+        <div class="modal-overlay" aria-hidden="true"></div>
+        
+        <div class="modal-content" role="document">
+            <div class="modal-header">
+                <h2 id="notificationModalTitle">Notification Settings</h2>
+                <button type="button" class="close-notification-modal" aria-label="Close notification settings" title="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            
+            <div class="notification-settings">
+                <div class="notification-status" id="notificationStatus">
+                    <p>Browser notifications are currently: <strong id="notificationStatusText">Unknown</strong></p>
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="enableNotifications" checked>
+                        <span>Enable browser notifications</span>
+                    </label>
+                    <p class="field-help">Receive reminders for upcoming tasks</p>
+                </div>
+
+                <div class="form-group notification-timing">
+                    <h3>Notification Timing</h3>
+                    
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="notifyOneDayBefore" checked>
+                        <span>24 hours before due date</span>
+                    </label>
+                    
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="notifyOneHourBefore" checked>
+                        <span>1 hour before due date</span>
+                    </label>
+                    
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="notifyOverdue" checked>
+                        <span>When tasks become overdue</span>
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" id="saveNotificationSettings">
+                        Save Settings
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="testNotification">
+                        Test Notification
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reports Dashboard Modal (NEW) -->
+    <div id="reportsModal" class="modal modal-large" role="dialog" aria-modal="true" aria-labelledby="reportsModalTitle" aria-hidden="true">
+        <div class="modal-overlay" aria-hidden="true"></div>
+        
+        <div class="modal-content modal-content-large" role="document">
+            <div class="modal-header">
+                <h2 id="reportsModalTitle">📊 Productivity Reports</h2>
+                <button type="button" class="close-reports-modal" aria-label="Close reports" title="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            
+            <div id="reportsDashboard" class="reports-dashboard">
+                <!-- Reports will be dynamically generated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Export Options Modal (NEW) -->
+    <div id="exportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle" aria-hidden="true">
+        <div class="modal-overlay" aria-hidden="true"></div>
+        
+        <div class="modal-content" role="document">
+            <div class="modal-header">
+                <h2 id="exportModalTitle">📥 Export Tasks</h2>
+                <button type="button" class="close-export-modal" aria-label="Close export options" title="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            
+            <div class="export-options">
+                <p class="export-description">Choose an export format to download your tasks:</p>
+
+                <div class="export-buttons">
+                    <button type="button" id="exportCSVBtn" class="btn-export-option">
+                        <span class="export-icon">📊</span>
+                        <div class="export-details">
+                            <h3>Export to CSV</h3>
+                            <p>Download tasks as a spreadsheet file</p>
+                        </div>
+                    </button>
+
+                    <button type="button" id="exportPDFBtn" class="btn-export-option">
+                        <span class="export-icon">📄</span>
+                        <div class="export-details">
+                            <h3>Export to PDF</h3>
+                            <p>Generate a PDF report with statistics</p>
+                        </div>
+                    </button>
+
+                    <button type="button" id="exportJSONBtn" class="btn-export-option">
+                        <span class="export-icon">💾</span>
+                        <div class="export-details">
+                            <h3>Export to JSON</h3>
+                            <p>Backup tasks as JSON (for re-import)</p>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="export-options-section">
+                    <h3>Export Options</h3>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="exportOnlyVisible" checked>
+                        <span>Export only currently visible tasks (filtered)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen reader announcement area -->
+    <div id="filterAnnouncement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Application Footer -->
+    <footer class="app-footer">
+        <p>&copy; 2025 Zenith. Built with simplicity in mind.</p>
+    </footer>
+
+    <!-- JavaScript Files -->
+    <script src="task.js"></script>
+    <script src="storage.js"></script>
+    <script src="notifications.js"></script>
+    <script src="reports.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
